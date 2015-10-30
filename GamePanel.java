@@ -3,9 +3,13 @@ package com.example.alec.myfirstgame;
 import android.content.Context;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Rect;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+
+import java.util.ArrayList;
+import java.util.Random;
 
 
 public class GamePanel extends SurfaceView implements SurfaceHolder.Callback
@@ -16,6 +20,11 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback
     private MainThread thread;
     private Background bg;
     private Player player;
+    private ArrayList<Smokepuff> smoke;
+    private long smokeStartTime;
+    private ArrayList<Missile> missiles;
+    private long missileStartTime;
+    private Random rand = new Random();
 
     public GamePanel(Context context)
     {
@@ -37,13 +46,15 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback
     @Override
     public void surfaceDestroyed(SurfaceHolder holder){
         boolean retry = true;
-        while(retry)
+        int counter = 0;
+        while(retry && counter < 1000)
         {
+            counter++;
             try{thread.setRunning(false);
                 thread.join();
+                retry = false;
 
             }catch(InterruptedException e){e.printStackTrace();}
-            retry = false;
         }
 
     }
@@ -54,6 +65,11 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback
         bg = new Background(BitmapFactory.decodeResource(getResources(), R.drawable.grassbg1));
         player = new Player(BitmapFactory.decodeResource(getResources(),R.drawable.helicopter)
                 ,65,25,3);
+        smoke = new ArrayList<Smokepuff>();
+        missiles = new ArrayList<Missile>();
+        missileStartTime = System.nanoTime();
+        smokeStartTime = System.nanoTime();
+
         //we can safely start the game loop
         thread.setRunning(true);
         thread.start();
@@ -84,8 +100,55 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback
         if(player.getPlaying()) {
             bg.update();
             player.update();
+
+            long missilesElapsed = (System.nanoTime() - missileStartTime)/1000000;
+            if(missilesElapsed > (2000 - player.getScore()/4)){
+                if(missiles.size() == 0){
+                    missiles.add(new Missile(BitmapFactory.decodeResource(getResources(),R.drawable.
+                            missile),WIDTH+10,HEIGHT/2,45,15,player.getScore(),13));
+                }
+                else{
+                    missiles.add(new Missile(BitmapFactory.decodeResource(getResources(),R.drawable.
+                    missile),WIDTH+10,(int)(rand.nextDouble()*(HEIGHT)),45,15,player.getScore()
+                            ,13));
+                }
+                missileStartTime = System.nanoTime();
+            }
+
+            for(int i = 0; i<missiles.size();++i){
+                missiles.get(i).update();
+                if(collision(missiles.get(i),player)){
+                    missiles.remove(i);
+                    player.setPlaying(false);
+                    break;
+                }
+                if(missiles.get(i).getX()<-100){
+                    missiles.remove(i);
+                    break;
+                }
+            }
+
+            long elapsed = (System.nanoTime() - smokeStartTime)/1000000;
+            if(elapsed > 120){
+                smoke.add(new Smokepuff(player.getX(),player.getY()+10));
+                smokeStartTime = System.nanoTime();
+            }
+            for(int i = 0; i < smoke.size(); ++i){
+                smoke.get(i).update();
+                if (smoke.get(i).getX() < -10){
+                    smoke.remove(i);
+                }
+            }
         }
     }
+
+    public boolean collision(GameObject a, GameObject b){
+        if(Rect.intersects(a.getRectangle(),b.getRectangle())){
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public void draw(Canvas canvas)
     {
@@ -96,6 +159,12 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback
             canvas.scale(scaleFactorX, scaleFactorY);
             bg.draw(canvas);
             player.draw(canvas);
+            for(Smokepuff puff: smoke){
+                puff.draw(canvas);
+            }
+            for (Missile ms: missiles){
+                ms.draw(canvas);
+            }
             canvas.restoreToCount(savedState);
         }
     }
