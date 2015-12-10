@@ -21,12 +21,12 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback
     public static final int HEIGHT = 480;
     public static final int MOVESPEED = -5;
     private long smokeStartTime;
-    private long missileStartTime;
+    private long letterStartTime;
     private MainThread thread;
     private Background bg;
     private Player player;
     private ArrayList<Smokepuff> smoke;
-    private ArrayList<Missile> missiles;
+    private ArrayList<Letter> letters;
     private ArrayList<TopBorder> topborder;
     private ArrayList<BotBorder> botborder;
     private Random rand = new Random();
@@ -89,11 +89,11 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback
         bg = new Background(BitmapFactory.decodeResource(getResources(), R.drawable.grassbg1));
         player = new Player(BitmapFactory.decodeResource(getResources(), R.drawable.helicopter), 65, 25, 3);
         smoke = new ArrayList<Smokepuff>();
-        missiles = new ArrayList<Missile>();
+        letters = new ArrayList<Letter>();
         topborder = new ArrayList<TopBorder>();
         botborder = new ArrayList<BotBorder>();
         smokeStartTime=  System.nanoTime();
-        missileStartTime = System.nanoTime();
+        letterStartTime = System.nanoTime();
 
         thread = new MainThread(getHolder(), this);
         //we can safely start the game loop
@@ -176,43 +176,55 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback
             //udpate bottom border
             this.updateBottomBorder();
 
-            //add missiles on timer
-            long missileElapsed = (System.nanoTime()-missileStartTime)/1000000;
-            if(missileElapsed >(2000 - player.getScore()/4)){
+            //add letters on timer
+            long letterElapsed = (System.nanoTime()-letterStartTime)/1000000;
+            if(letterElapsed >(2000 - player.getScore()/4)){
 
 
-                //first missile always goes down the middle
-                if(missiles.size()==0)
+                //first letter always goes down the middle
+                if(letters.size()==0)
                 {
-                    missiles.add(new Missile(BitmapFactory.decodeResource(getResources(),R.drawable.
-                            missile),WIDTH + 10, HEIGHT/2, 45, 15, player.getScore(), 13));
+                    letters.add(new Letter(WIDTH + 10, HEIGHT/2, player.getScore()));
                 }
                 else
                 {
 
-                    missiles.add(new Missile(BitmapFactory.decodeResource(getResources(),R.drawable.missile),
-                            WIDTH+10, (int)(rand.nextDouble()*(HEIGHT - (maxBorderHeight * 2))+maxBorderHeight),45,15, player.getScore(),13));
+                    letters.add(new Letter(WIDTH+10, (int)(rand.nextDouble()*(HEIGHT -
+                            (maxBorderHeight * 2))+maxBorderHeight), player.getScore()));
                 }
 
                 //reset timer
-                missileStartTime = System.nanoTime();
+                letterStartTime = System.nanoTime();
             }
-            //loop through every missile and check collision and remove
-            for(int i = 0; i<missiles.size();i++)
+            //loop through every letter and check collision and remove
+            for(int i = 0; i<letters.size();i++)
             {
-                //update missile
-                missiles.get(i).update();
+                //update letter
+                letters.get(i).update();
 
-                if(collision(missiles.get(i),player))
+                if(collision(letters.get(i),player))
                 {
-                    missiles.remove(i);
-                    player.setPlaying(false);
+                    player.addLetter(letters.get(i));
+                    letters.remove(i);
+                    if (!(player.getTargetCodon().substring(0,player.getCodonCompact().length()).equals(player.getCodonCompact()))){
+                        player.setPlaying(false);
+                        break;
+                    }
+                    if(player.getCodonCompact().length() == 3){
+                        if (player.getCodonCompact().equals(player.getTargetCodon())){
+                            player.newAcid();
+                            player.addScore(10);
+                        }
+                    }
+                    if (player.getCodonCompact().length() >= 3){
+                        player.clearCodon();
+                    }
                     break;
                 }
-                //remove missile if it is way off the screen
-                if(missiles.get(i).getX()<-100)
+                //remove letter if it is way off the screen
+                if(letters.get(i).getX()<-100)
                 {
-                    missiles.remove(i);
+                    letters.remove(i);
                     break;
                 }
             }
@@ -283,8 +295,8 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback
             {
                 sp.draw(canvas);
             }
-            //draw missiles
-            for(Missile m: missiles)
+            //draw letter
+            for(Letter m: letters)
             {
                 m.draw(canvas);
             }
@@ -404,12 +416,13 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback
         botborder.clear();
         topborder.clear();
 
-        missiles.clear();
+        letters.clear();
         smoke.clear();
 
         minBorderHeight = 5;
         maxBorderHeight = 30;
 
+        player.clearCodon();
         player.resetDY();
         player.resetScore();
         player.setY(HEIGHT/2);
@@ -465,18 +478,22 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback
         paint.setTextSize(30);
         paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
         canvas.drawText("DISTANCE: " + (player.getScore()*3), 10, HEIGHT - 10, paint);
-        canvas.drawText("BEST: " + best, WIDTH - 215, HEIGHT - 10, paint);
+        canvas.drawText("CODON: " + player.getCodon(), WIDTH - 215, HEIGHT - 10, paint);
+        canvas.drawText("BUILD: " + player.getAcid() + " (" + player.getTargetCodon() + ")", 10, HEIGHT/15, paint);
 
         if(!player.getPlaying()&&newGameCreated&&reset)
         {
             Paint paint1 = new Paint();
             paint1.setTextSize(40);
             paint1.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-            canvas.drawText("PRESS TO START", WIDTH/2-50, HEIGHT/2, paint1);
+            canvas.drawText("PRESS TO START", WIDTH/2-50, HEIGHT / 2, paint1);
 
             paint1.setTextSize(20);
             canvas.drawText("PRESS AND HOLD TO GO UP", WIDTH/2-50, HEIGHT/2 + 20, paint1);
             canvas.drawText("RELEASE TO GO DOWN", WIDTH/2-50, HEIGHT/2 + 40, paint1);
+            canvas.drawText("BUILD THE CODON", WIDTH/2-50, HEIGHT/2 + 60, paint1);
         }
     }
+
+
 }
