@@ -1,3 +1,5 @@
+//animation class for animating objects
+
 package com.example.alec.myfirstgame;
 
 import android.graphics.Bitmap;
